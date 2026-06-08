@@ -7,39 +7,58 @@ const ollama = new OpenAI({
 })
 
 export async function POST(request: Request) {
+    try {
+        const { text, documentId } = await request.json();
 
-    const { text, documentId } = await request.json()
+        if (!text) {
+            return Response.json(
+                { error: 'Question is required' },
+                { status: 400 }
+            );
+        }
 
+        const response = await ollama.embeddings.create({
+            model: 'nomic-embed-text',
+            input: text,
+        });
 
-    const response = await ollama.embeddings.create({
-        model: 'nomic-embed-text',
-        input: text,
-    })
+        const result = await supabase.rpc('match_documents', {
+            query_embedding: response.data[0].embedding,
+            filter_document_id: documentId,
+        });
 
-    const result = await supabase.rpc('match_documents', {
-        query_embedding: response.data[0].embedding, filter_document_id: documentId
-    })
+        const contextString = result.data
+            ?.map((c: any) => c.content)
+            .join('\n\n');
 
-    const contextString = result.data?.map((c: any) => c.content).join('\n\n')
+        const chatCompletion = await ollama.chat.completions.create({
+            model: "llama3.2",
+            messages: [
+                {
+                    role: "system",
+                    content: `You are a helpful assistant. 
+                    Answer the user's question using only the context below.
+                    If the answer isn't in the context say so.
 
+                    Context:
+                    ${contextString}`,
+                },
+                {
+                    role: "user",
+                    content: text,
+                },
+            ],
+        });
 
-    const userMessage = text
+        return Response.json({
+            answer: chatCompletion.choices[0].message.content,
+        });
+    } catch (error) {
+        console.log(error);
 
-    const chatCompletion = await ollama.chat.completions.create({
-        model: "llama3.2",
-        messages: [
-            {
-                role: "system",
-                content: `You are a helpful assistant. Answer the user's question using only the context below. If the answer isn't in the context say so.\n\nContext: ${contextString}`,
-            },
-            {
-                role: "user",
-                content: userMessage,
-            },
-        ],
-
-    });
-
-
-    return Response.json({ answer: chatCompletion.choices[0].message.content })
+        return Response.json(
+            { error: 'Failed to generate response' },
+            { status: 500 }
+        );
+    }
 }
