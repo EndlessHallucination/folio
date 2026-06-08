@@ -7,15 +7,18 @@ const ollama = new OpenAI({
 })
 
 export async function POST(request: Request) {
-    const { text } = await request.json()
+
+    const { text, documentId } = await request.json()
 
 
     const response = await ollama.embeddings.create({
         model: 'nomic-embed-text',
-        input: text
+        input: text,
     })
 
-    const result = await supabase.rpc('match_documents', { query_embedding: response.data[0].embedding })
+    const result = await supabase.rpc('match_documents', {
+        query_embedding: response.data[0].embedding, filter_document_id: documentId
+    })
 
     const contextString = result.data?.map((c: any) => c.content).join('\n\n')
 

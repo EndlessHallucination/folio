@@ -4,12 +4,14 @@ import { useState } from "react";
 export default function Home() {
   const [isUploading, setIsUploading] = useState(false);
   const [isReady, setIsReady] = useState(false);
-
   const [question, setQuestion] = useState("");
-
   const [messages, setMessages] = useState<
     { question: string; answer: string }[]
   >([]);
+  const [isLoading, setIsLoading] = useState(false)
+  const [documentId, setDocumentId] = useState<string | null>(null)
+
+
 
   async function handleUpload(e: any) {
     e.preventDefault();
@@ -27,7 +29,9 @@ export default function Home() {
 
 
       if (response.ok) {
-        setIsReady(true);
+        const data = await response.json()
+        setDocumentId(data.documentId)
+        setIsReady(true)
       }
     } catch (error) {
       console.log(error);
@@ -40,6 +44,7 @@ export default function Home() {
     e.preventDefault();
 
     if (!question.trim()) return;
+    setIsLoading(true)
 
     try {
       const response = await fetch("/api/chat", {
@@ -49,6 +54,7 @@ export default function Home() {
         },
         body: JSON.stringify({
           text: question,
+          documentId
         }),
       });
 
@@ -62,10 +68,12 @@ export default function Home() {
             answer: data.answer,
           },
         ]);
-
+        setIsLoading(false)
         setQuestion("");
+
       }
     } catch (error) {
+      setIsLoading(false)
       console.log(error);
     }
   }
@@ -134,7 +142,9 @@ export default function Home() {
               }}
             />
 
-            <button type="submit">Send</button>
+            <button
+              disabled={isLoading}
+              type="submit">Send</button>
           </form>
 
           <div

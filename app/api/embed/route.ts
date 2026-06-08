@@ -1,8 +1,9 @@
 import OpenAI from 'openai'
 import pdfParse from 'pdf-parse'
+import crypto from 'crypto'
+
 import { supabase } from '@/lib/supabase'
 import { chunkTextByWords } from '@/lib/chunker'
-
 
 const ollama = new OpenAI({
     baseURL: 'http://localhost:11434/v1',
@@ -11,6 +12,8 @@ const ollama = new OpenAI({
 
 export async function POST(request: Request) {
     try {
+        const documentId = crypto.randomUUID()
+
         const formData = await request.formData()
 
         const file = formData.get('document') as File
@@ -24,6 +27,42 @@ export async function POST(request: Request) {
 
         const arrayBuffer = await file.arrayBuffer()
         const buffer = Buffer.from(arrayBuffer)
+
+        const hash = crypto
+            .createHash('sha256')
+            .update(buffer)
+            .digest('hex')
+
+        const { data: existingFile } = await supabase
+            .from('uploaded_files')
+            .select('*')
+            .eq('file_hash', hash)
+            .single()
+
+        if (existingFile) {
+            return Response.json({
+                success: true,
+                alreadyExists: true,
+                documentId: existingFile.document_id
+            })
+        }
+
+        const { error: uploadError } = await supabase
+            .from('uploaded_files')
+            .insert({
+                file_hash: hash,
+                file_name: file.name,
+                document_id: documentId
+            })
+
+        if (uploadError) {
+            console.log(uploadError)
+
+            return Response.json(
+                { error: 'Failed to save upload record' },
+                { status: 500 }
+            )
+        }
 
         const pdfData = await pdfParse(buffer)
 
@@ -43,7 +82,8 @@ export async function POST(request: Request) {
                 .from('documents')
                 .insert({
                     content: chunk,
-                    embedding
+                    embedding,
+                    document_id: documentId
                 })
 
             if (error) {
@@ -53,7 +93,8 @@ export async function POST(request: Request) {
 
         return Response.json({
             success: true,
-            chunks: chunks.length
+            chunks: chunks.length,
+            documentId
         })
 
     } catch (error) {
@@ -65,4 +106,3 @@ export async function POST(request: Request) {
         )
     }
 }
-
