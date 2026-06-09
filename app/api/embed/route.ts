@@ -94,7 +94,8 @@ export async function POST(request: Request) {
         return Response.json({
             success: true,
             chunks: chunks.length,
-            documentId
+            documentId,
+            fileName: file.name
         })
 
     } catch (error) {

@@ -9,6 +9,7 @@ export default function Home() {
   const [uploadStatus, setUploadStatus] = useState<"idle" | "uploading" | "success" | "duplicate" | "error">("idle");
   const [uploadMessage, setUploadMessage] = useState("");
   const [chatError, setChatError] = useState("");
+  const [currentPDF, setCurrentPDF] = useState('')
 
   const isReady = uploadStatus === "success" || uploadStatus === "duplicate";
 
@@ -23,6 +24,8 @@ export default function Home() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Upload failed");
       setDocumentId(data.documentId);
+      setMessages([])
+      setCurrentPDF(data.fileName)
       if (data.alreadyExists) {
         setUploadStatus("duplicate");
         setUploadMessage("Already indexed — connected to existing document.");
@@ -81,8 +84,8 @@ export default function Home() {
             className="border border-dashed border-zinc-200 flex flex-col items-center justify-center gap-2 py-6 cursor-pointer hover:bg-zinc-50 transition-colors"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-zinc-400">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-              <polyline points="14 2 14 8 20 8"/>
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
             </svg>
             <span className="text-[13px] text-zinc-500">
               Drop a PDF or click to browse
@@ -113,11 +116,10 @@ export default function Home() {
         {/* Status bar */}
         {uploadStatus !== "idle" && (
           <div className="px-5 py-3 border-t border-zinc-100 flex items-center gap-2.5">
-            <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-              isReady ? "bg-blue-600" :
+            <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isReady ? "bg-blue-600" :
               uploadStatus === "uploading" ? "bg-zinc-400 animate-pulse" :
-              "bg-red-500"
-            }`} />
+                "bg-red-500"
+              }`} />
             <span className="font-mono text-[11px] text-zinc-500">
               {uploadMessage || "Processing…"}
             </span>
@@ -131,7 +133,7 @@ export default function Home() {
 
           <div className="px-5 py-3.5 border-b border-zinc-100 flex items-center justify-between">
             <span className="font-mono text-[10px] tracking-widest uppercase text-zinc-400">
-              Chat
+              {currentPDF}
             </span>
             {messages.length > 0 && (
               <span className="font-mono text-[10px] text-zinc-400">
