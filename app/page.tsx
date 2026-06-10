@@ -1,5 +1,5 @@
 'use client'
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
@@ -10,6 +10,17 @@ export default function Home() {
   const [uploadMessage, setUploadMessage] = useState("");
   const [chatError, setChatError] = useState("");
   const [currentPDF, setCurrentPDF] = useState('')
+  const [documents, setDocuments] = useState<{ file_name: string, document_id: string }[]>([])
+
+  async function fetchDocuments() {
+    const response = await fetch("/api/documents")
+    const data = await response.json()
+    setDocuments(data)
+  }
+
+  useEffect(() => {
+    fetchDocuments()
+  }, [])
 
   const isReady = uploadStatus === "success" || uploadStatus === "duplicate";
 
@@ -26,6 +37,8 @@ export default function Home() {
       setDocumentId(data.documentId);
       setMessages([])
       setCurrentPDF(data.fileName)
+      await fetchDocuments()
+
       if (data.alreadyExists) {
         setUploadStatus("duplicate");
         setUploadMessage("Already indexed — connected to existing document.");
@@ -68,6 +81,25 @@ export default function Home() {
       <span className="font-mono text-[11px] tracking-[0.35em] uppercase text-zinc-900 font-medium mb-10">
         Folio
       </span>
+
+      {/* Dropdown */}
+      <select value={documentId || ""}
+        onChange={(e) => {
+          const selected = documents.find(d => d.document_id === e.target.value)
+          if (selected) {
+            setDocumentId(selected.document_id)
+            setCurrentPDF(selected.file_name)
+            setMessages([])
+          }
+        }}>
+        <option value="" disabled>Select a document…</option>
+
+        {documents.map((d) => (
+          <option key={d.document_id} value={d.document_id}>
+            {d.file_name}
+          </option>
+        ))}
+      </select>
 
       {/* Upload card */}
       <div className="w-full max-w-[420px] bg-white border border-zinc-200">
