@@ -8,7 +8,7 @@ const ollama = new OpenAI({
 
 export async function POST(request: Request) {
     try {
-        const { text, documentId } = await request.json();
+        const { text, documentIds } = await request.json();
 
         if (!text) {
             return Response.json(
@@ -24,7 +24,7 @@ export async function POST(request: Request) {
 
         const result = await supabase.rpc('match_documents', {
             query_embedding: response.data[0].embedding,
-            filter_document_id: documentId,
+            filter_document_ids: documentIds,
         });
 
         const contextString = result.data

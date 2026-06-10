@@ -5,12 +5,14 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [question, setQuestion] = useState("");
   const [messages, setMessages] = useState<{ question: string; answer: string }[]>([]);
-  const [documentId, setDocumentId] = useState<string | null>(null);
+  const [documentIds, setDocumentIds] = useState<string[]>([])
   const [uploadStatus, setUploadStatus] = useState<"idle" | "uploading" | "success" | "duplicate" | "error">("idle");
   const [uploadMessage, setUploadMessage] = useState("");
   const [chatError, setChatError] = useState("");
   const [currentPDF, setCurrentPDF] = useState('')
   const [documents, setDocuments] = useState<{ file_name: string, document_id: string }[]>([])
+  const [showDocuments, setShowDocuments] = useState(false)
+
 
   async function fetchDocuments() {
     const response = await fetch("/api/documents")
@@ -22,7 +24,7 @@ export default function Home() {
     fetchDocuments()
   }, [])
 
-  const isReady = uploadStatus === "success" || uploadStatus === "duplicate";
+  const isReady = documentIds.length > 0
 
   async function handleUpload(e: any) {
     e.preventDefault();
@@ -34,7 +36,7 @@ export default function Home() {
       const response = await fetch("/api/embed", { method: "POST", body: formData });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Upload failed");
-      setDocumentId(data.documentId);
+      setDocumentIds([data.documentId])
       setMessages([])
       setCurrentPDF(data.fileName)
       await fetchDocuments()
@@ -61,7 +63,7 @@ export default function Home() {
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: question, documentId }),
+        body: JSON.stringify({ text: question, documentIds }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Failed to get answer");
@@ -83,23 +85,42 @@ export default function Home() {
       </span>
 
       {/* Dropdown */}
-      <select value={documentId || ""}
-        onChange={(e) => {
-          const selected = documents.find(d => d.document_id === e.target.value)
-          if (selected) {
-            setDocumentId(selected.document_id)
-            setCurrentPDF(selected.file_name)
-            setMessages([])
-          }
-        }}>
-        <option value="" disabled>Select a document…</option>
+      <div className="w-full max-w-[420px] bg-white border border-zinc-200 mb-0">
+        <button
+          type="button"
+          onClick={() => setShowDocuments(prev => !prev)}
+          className="w-full px-5 py-3.5 flex items-center justify-between"
+        >
+          <span className="font-mono text-[10px] tracking-widest uppercase text-zinc-400">
+            Documents
+          </span>
+          <span className="font-mono text-[10px] text-zinc-400">
+            {documentIds.length > 0 ? `${documentIds.length} selected` : "none"} {showDocuments ? "▲" : "▼"}
+          </span>
+        </button>
 
-        {documents.map((d) => (
-          <option key={d.document_id} value={d.document_id}>
-            {d.file_name}
-          </option>
-        ))}
-      </select>
+        {showDocuments && (
+          <div className="flex flex-col divide-y divide-zinc-100 border-t border-zinc-100">
+
+            {documents.map((d) => (
+              <label key={d.document_id} className="flex items-center gap-3 px-5 py-3 cursor-pointer hover:bg-zinc-50">
+                <input
+                  type="checkbox"
+                  checked={documentIds.includes(d.document_id)}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setDocumentIds(prev => [...prev, d.document_id])
+                    } else {
+                      setDocumentIds(prev => prev.filter(id => id !== d.document_id))
+                    }
+                  }}
+                />
+                <span className="font-mono text-[11px] text-zinc-600">{d.file_name}</span>
+              </label>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Upload card */}
       <div className="w-full max-w-[420px] bg-white border border-zinc-200">
@@ -160,72 +181,74 @@ export default function Home() {
       </div>
 
       {/* Chat card — only shown when ready */}
-      {isReady && (
-        <div className="w-full max-w-[420px] bg-white border border-zinc-200 border-t-0">
+      {
+        isReady && (
+          <div className="w-full max-w-[420px] bg-white border border-zinc-200 border-t-0">
 
-          <div className="px-5 py-3.5 border-b border-zinc-100 flex items-center justify-between">
-            <span className="font-mono text-[10px] tracking-widest uppercase text-zinc-400">
-              {currentPDF}
-            </span>
-            {messages.length > 0 && (
-              <span className="font-mono text-[10px] text-zinc-400">
-                {messages.length} {messages.length === 1 ? "message" : "messages"}
+            <div className="px-5 py-3.5 border-b border-zinc-100 flex items-center justify-between">
+              <span className="font-mono text-[10px] tracking-widest uppercase text-zinc-400">
+                {currentPDF}
               </span>
-            )}
-          </div>
-
-          {/* Messages */}
-          <div className="flex flex-col divide-y divide-zinc-50">
-            {messages.length === 0 ? (
-              <div className="px-5 py-8 text-center">
-                <span className="font-mono text-[11px] text-zinc-400">
-                  Ask a question about your document
+              {messages.length > 0 && (
+                <span className="font-mono text-[10px] text-zinc-400">
+                  {messages.length} {messages.length === 1 ? "message" : "messages"}
                 </span>
-              </div>
-            ) : (
-              messages.map((msg, i) => (
-                <div key={i} className="px-5 py-4">
-                  <p className="font-mono text-[11px] text-zinc-400 mb-1.5">
-                    <span className="text-zinc-500">Q —</span> {msg.question}
-                  </p>
-                  <p className="text-[13px] text-zinc-700 leading-relaxed">
-                    {msg.answer}
-                  </p>
-                </div>
-              ))
-            )}
-          </div>
-
-          {chatError && (
-            <div className="px-5 py-3 border-t border-zinc-100 flex items-center gap-2.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" />
-              <span className="font-mono text-[11px] text-red-600">{chatError}</span>
+              )}
             </div>
-          )}
 
-          {/* Input row */}
-          <form
-            onSubmit={handleChat}
-            className="flex border-t border-zinc-100"
-          >
-            <input
-              type="text"
-              placeholder="Ask about your document…"
-              value={question}
-              disabled={isLoading}
-              onChange={(e) => setQuestion(e.target.value)}
-              className="flex-1 px-4 py-3 text-[13px] text-zinc-800 placeholder:text-zinc-400 bg-transparent outline-none border-none disabled:opacity-50"
-            />
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="px-4 py-3 border-l border-zinc-100 font-mono text-[10px] tracking-widest uppercase text-zinc-500 hover:bg-zinc-50 transition-colors disabled:opacity-40"
+            {/* Messages */}
+            <div className="flex flex-col divide-y divide-zinc-50">
+              {messages.length === 0 ? (
+                <div className="px-5 py-8 text-center">
+                  <span className="font-mono text-[11px] text-zinc-400">
+                    Ask a question about your document
+                  </span>
+                </div>
+              ) : (
+                messages.map((msg, i) => (
+                  <div key={i} className="px-5 py-4">
+                    <p className="font-mono text-[11px] text-zinc-400 mb-1.5">
+                      <span className="text-zinc-500">Q —</span> {msg.question}
+                    </p>
+                    <p className="text-[13px] text-zinc-700 leading-relaxed">
+                      {msg.answer}
+                    </p>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {chatError && (
+              <div className="px-5 py-3 border-t border-zinc-100 flex items-center gap-2.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" />
+                <span className="font-mono text-[11px] text-red-600">{chatError}</span>
+              </div>
+            )}
+
+            {/* Input row */}
+            <form
+              onSubmit={handleChat}
+              className="flex border-t border-zinc-100"
             >
-              {isLoading ? "…" : "Send"}
-            </button>
-          </form>
-        </div>
-      )}
-    </main>
+              <input
+                type="text"
+                placeholder="Ask about your document…"
+                value={question}
+                disabled={isLoading}
+                onChange={(e) => setQuestion(e.target.value)}
+                className="flex-1 px-4 py-3 text-[13px] text-zinc-800 placeholder:text-zinc-400 bg-transparent outline-none border-none disabled:opacity-50"
+              />
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="px-4 py-3 border-l border-zinc-100 font-mono text-[10px] tracking-widest uppercase text-zinc-500 hover:bg-zinc-50 transition-colors disabled:opacity-40"
+              >
+                {isLoading ? "…" : "Send"}
+              </button>
+            </form>
+          </div>
+        )
+      }
+    </main >
   );
 }
